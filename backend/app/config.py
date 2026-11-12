@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 class Config:
     SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
-    MONGO_URI = os.environ.get("MONGODB_URI", "mongodb://localhost:27017/thunai")
+    MONGO_URI = os.environ.get("MONGODB_URI", "mongodb+srv://thunai_user:vicky006@cluster0.c0eueo4.mongodb.net/")
     DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
 
     _jwt_secret = os.environ.get("JWT_SECRET_KEY")

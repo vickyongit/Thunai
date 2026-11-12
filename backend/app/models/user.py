@@ -6,15 +6,21 @@ from app.extensions import mongo
 logger = logging.getLogger(__name__)
 
 
+class DatabaseUnavailable(Exception):
+    pass
+
+
 def get_users_collection():
     """Return the users collection or raise if DB is unavailable."""
+    if mongo.db is None:
+        raise DatabaseUnavailable("Database unavailable")
     return mongo.db.users
 
 
 def create_indexes():
     """Create unique index on email. Wrapped so server starts even if Mongo is down."""
     try:
-        mongo.db.users.create_index("email", unique=True)
+        get_users_collection().create_index("email", unique=True)
         logger.info("Users collection index ensured.")
     except Exception as e:
         logger.warning("Could not create users index (MongoDB may be down): %s", e)

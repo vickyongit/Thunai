@@ -30,6 +30,7 @@ export function AuthProvider({ children }) {
     setUser(null)
     setToken(null)
     setStoredToken(null)
+    document.documentElement.classList.remove('elder-mode')
   }, [])
 
   // Restore session on mount
@@ -56,6 +57,9 @@ export function AuthProvider({ children }) {
         if (json && json.success && json.data?.user) {
           setUser(json.data.user)
           setToken(storedToken)
+          if (json.data.user.elder_mode) {
+            document.documentElement.classList.add('elder-mode')
+          }
         } else if (json !== null) {
           // Some other error — clear token
           setStoredToken(null)
@@ -83,6 +87,9 @@ export function AuthProvider({ children }) {
     setStoredToken(json.data.token)
     setToken(json.data.token)
     setUser(json.data.user)
+    if (json.data.user.elder_mode) {
+      document.documentElement.classList.add('elder-mode')
+    }
     return json.data
   }, [])
 
@@ -102,8 +109,24 @@ export function AuthProvider({ children }) {
     return json.data
   }, [])
 
+  const refreshUser = useCallback(async () => {
+    const storedToken = getStoredToken()
+    if (!storedToken) return
+    try {
+      const res = await fetch('/api/auth/me', {
+        headers: { Authorization: `Bearer ${storedToken}` },
+      })
+      const json = await res.json()
+      if (json.success && json.data?.user) {
+        setUser(json.data.user)
+      }
+    } catch {
+      // ignore refresh errors
+    }
+  }, [])
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   )

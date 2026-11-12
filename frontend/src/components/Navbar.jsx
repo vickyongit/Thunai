@@ -27,6 +27,18 @@ function Navbar() {
                   to="/dashboard"
                   className="text-sm text-gray-700 font-medium hover:text-primary-600 transition"
                 >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/contacts"
+                  className="text-sm text-gray-700 font-medium hover:text-primary-600 transition"
+                >
+                  Contacts
+                </Link>
+                <Link
+                  to="/profile"
+                  className="text-sm text-gray-700 font-medium hover:text-primary-600 transition"
+                >
                   {user.name}
                 </Link>
                 <button

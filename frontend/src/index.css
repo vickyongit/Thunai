@@ -13,3 +13,22 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* Elder Mode: larger text, higher contrast */
+html.elder-mode {
+  font-size: 1.2rem;
+}
+
+html.elder-mode body {
+  color: #111111;
+}
+
+html.elder-mode .text-gray-400,
+html.elder-mode .text-gray-500 {
+  color: #555555 !important;
+}
+
+html.elder-mode button,
+html.elder-mode a {
+  letter-spacing: 0.01em;
+}

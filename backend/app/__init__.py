@@ -24,6 +24,9 @@ def create_app(config=None):
     if config:
         app.config.update(config)
 
+    # /api/contacts and /api/contacts/ both work (no 308 redirect that breaks CORS)
+    app.url_map.strict_slashes = False
+
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
@@ -36,23 +39,28 @@ def create_app(config=None):
 
     mongo.init_app(app)
 
-    # Blueprints
+    # ---------- Blueprints ----------
     from .blueprints.health.routes import health_bp
     from .blueprints.auth.routes import auth_bp
+    from .blueprints.profile.routes import profile_bp
+    from .blueprints.contacts.routes import contacts_bp
+
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
+    app.register_blueprint(profile_bp)
+    app.register_blueprint(contacts_bp)
 
-    # Create DB indexes (non-fatal if Mongo is down at startup)
+    # ---------- DB indexes (non-fatal if Mongo is down at startup) ----------
     with app.app_context():
         try:
             from .models.user import create_indexes
+            from .models.contact import create_contact_indexes
             create_indexes()
+            create_contact_indexes()
         except Exception as e:
             logger.warning("Could not create DB indexes at startup: %s", e)
 
     # ---------- Error handlers ----------
-
-    # Database problems -> clean 503 / 409 instead of a crash
     @app.errorhandler(DatabaseUnavailable)
     @app.errorhandler(ServerSelectionTimeoutError)
     @app.errorhandler(ConnectionFailure)
@@ -62,9 +70,8 @@ def create_app(config=None):
 
     @app.errorhandler(DuplicateKeyError)
     def duplicate_key(e):
-        return _error("DUPLICATE", "Email already registered", 409)
+        return _error("DUPLICATE", "This record already exists", 409)
 
-    # Known HTTP errors (400, 401, 404, 405, 415, 429, ...) keep their real status
     codes = {
         400: "BAD_REQUEST",
         401: "UNAUTHORIZED",
@@ -78,12 +85,10 @@ def create_app(config=None):
     @app.errorhandler(HTTPException)
     def http_error(e):
         status = e.code or 500
-        code = codes.get(status, "HTTP_ERROR")
         if status >= 500:
             return _error("INTERNAL_SERVER_ERROR", "An unexpected error occurred.", status)
-        return _error(code, e.description, status)
+        return _error(codes.get(status, "HTTP_ERROR"), e.description, status)
 
-    # Anything else -> logged, safe 500
     @app.errorhandler(Exception)
     def handle_exception(e):
         logger.exception("Unhandled exception: %s", e)

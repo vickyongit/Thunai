@@ -8,17 +8,25 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 
-class Config:
-    SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
-    MONGO_URI = os.environ.get("MONGODB_URI", "mongodb+srv://thunai_user:vicky006@cluster0.c0eueo4.mongodb.net/")
-    DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
-
-    _jwt_secret = os.environ.get("JWT_SECRET_KEY")
-    if not _jwt_secret:
-        _jwt_secret = secrets.token_hex(32)
+def _secret(name):
+    value = os.environ.get(name)
+    if not value:
+        value = secrets.token_hex(32)
         logger.warning(
-            "JWT_SECRET_KEY is not set. A temporary random key has been generated. "
-            "Set JWT_SECRET_KEY in your .env file for persistent sessions."
+            "%s is not set. A temporary random key was generated. "
+            "Set it in your .env file for persistent sessions.", name
         )
-    JWT_SECRET_KEY = _jwt_secret
+    return value
+
+
+class Config:
+    SECRET_KEY = _secret("SECRET_KEY")
+    JWT_SECRET_KEY = _secret("JWT_SECRET_KEY")
     JWT_EXPIRES_HOURS = int(os.environ.get("JWT_EXPIRES_HOURS", "24"))
+
+    # No credentials in code. Falls back to local MongoDB only.
+    MONGO_URI = os.environ.get("MONGO_URI") or os.environ.get("MONGODB_URI") or "mongodb://localhost:27017"
+    DB_NAME = os.environ.get("DB_NAME", "thunai")
+
+    DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
+    CLIENT_URL = os.environ.get("CLIENT_URL", "http://localhost:5173")

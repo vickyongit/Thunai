@@ -1,7 +1,11 @@
+import logging
 from flask import Flask, jsonify
 from flask_cors import CORS
 from .config import Config
 from .extensions import mongo
+
+logger = logging.getLogger(__name__)
+
 
 def create_app(config=None):
     app = Flask(__name__)
@@ -12,8 +16,19 @@ def create_app(config=None):
     CORS(app, resources={r"/api/*": {"origins": "*"}})
     mongo.init_app(app)
 
+    # Blueprints
     from .blueprints.health.routes import health_bp
+    from .blueprints.auth.routes import auth_bp
     app.register_blueprint(health_bp)
+    app.register_blueprint(auth_bp)
+
+    # Create DB indexes (non-fatal if Mongo is down at startup)
+    with app.app_context():
+        try:
+            from .models.user import create_indexes
+            create_indexes()
+        except Exception as e:
+            logger.warning("Could not create DB indexes at startup: %s", e)
 
     @app.errorhandler(400)
     def bad_request(e):
@@ -37,8 +52,7 @@ def create_app(config=None):
 
     @app.errorhandler(Exception)
     def handle_exception(e):
-        import logging
-        logging.exception("Unhandled exception: %s", e)
+        logger.exception("Unhandled exception: %s", e)
         return jsonify({"success": False, "error": {"code": "INTERNAL_SERVER_ERROR", "message": "An unexpected error occurred."}}), 500
 
     return app

@@ -30,3 +30,12 @@ class Config:
 
     DEBUG = os.environ.get("FLASK_DEBUG", "false").lower() == "true"
     CLIENT_URL = os.environ.get("CLIENT_URL", "http://localhost:5173")
+
+    _tz = os.environ.get("APP_TIMEZONE", "Asia/Kolkata")
+    try:
+        from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+        ZoneInfo(_tz)   # validates the tz name
+        APP_TIMEZONE = _tz
+    except (ZoneInfoNotFoundError, KeyError, Exception):
+        logger.warning("Invalid or unresolvable APP_TIMEZONE '%s', falling back to Asia/Kolkata.", _tz)
+        APP_TIMEZONE = "Asia/Kolkata"

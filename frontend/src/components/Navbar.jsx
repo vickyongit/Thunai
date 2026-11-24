@@ -30,6 +30,12 @@ function Navbar() {
                   Dashboard
                 </Link>
                 <Link
+                  to="/medicines"
+                  className="text-sm text-gray-700 font-medium hover:text-primary-600 transition"
+                >
+                  Medicines
+                </Link>
+                <Link
                   to="/contacts"
                   className="text-sm text-gray-700 font-medium hover:text-primary-600 transition"
                 >

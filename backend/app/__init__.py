@@ -45,12 +45,14 @@ def create_app(config=None):
     from .blueprints.profile.routes import profile_bp
     from .blueprints.contacts.routes import contacts_bp
     from .blueprints.medicines.routes import medicines_bp
+    from .blueprints.doses.routes import doses_bp
 
     app.register_blueprint(health_bp)
     app.register_blueprint(auth_bp)
     app.register_blueprint(profile_bp)
     app.register_blueprint(contacts_bp)
     app.register_blueprint(medicines_bp)
+    app.register_blueprint(doses_bp)
 
     # ---------- DB indexes (non-fatal if Mongo is down at startup) ----------
     with app.app_context():
@@ -58,9 +60,11 @@ def create_app(config=None):
             from .models.user import create_indexes
             from .models.contact import create_contact_indexes
             from .models.medicine import create_medicine_indexes
+            from .models.dose_log import create_dose_log_indexes
             create_indexes()
             create_contact_indexes()
             create_medicine_indexes()
+            create_dose_log_indexes()
         except Exception as e:
             logger.warning("Could not create DB indexes at startup: %s", e)
 

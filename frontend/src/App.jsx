@@ -14,6 +14,7 @@ import SignupPage from './pages/SignupPage.jsx'
 import DashboardPage from './pages/DashboardPage.jsx'
 import ProfilePage from './pages/ProfilePage.jsx'
 import ContactsPage from './pages/ContactsPage.jsx'
+import MedicinesPage from './pages/MedicinesPage.jsx'
 
 function AppRoutes() {
   const navigate = useNavigate()
@@ -71,6 +72,14 @@ function AppRoutes() {
             element={
               <ProtectedRoute>
                 <ContactsPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/medicines"
+            element={
+              <ProtectedRoute>
+                <MedicinesPage />
               </ProtectedRoute>
             }
           />

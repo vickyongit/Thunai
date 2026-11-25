@@ -20,8 +20,12 @@ def create_dose_log_indexes():
             unique=True,
             name="unique_dose_per_slot",
         )
-        # For fast today queries
+        # For fast today queries by user
         col.create_index([("user_id", 1), ("scheduled_date", 1)], name="user_date")
+        # For missed-dose detection: find pending doses whose scheduled_at has passed
+        col.create_index([("status", 1), ("scheduled_at", 1)], name="status_scheduled_at")
+        # For escalation: Step 7 picks up logs where escalation_status == "pending"
+        col.create_index([("escalation_status", 1)], name="escalation_status")
         logger.info("dose_logs collection indexes ensured.")
     except Exception as e:
         logger.warning("Could not create dose_log indexes: %s", e)
@@ -53,7 +57,9 @@ def serialize_dose(log):
         "taken_at": _utc_iso(log.get("taken_at")),
         "was_late": log.get("was_late", False),
         "stock_decremented": log.get("stock_decremented", False),
-        # medicine info from snapshot (may be overridden from live medicine data)
+        "missed_at": _utc_iso(log.get("missed_at")),
+        "escalation_status": log.get("escalation_status", "none"),
+        # medicine info from snapshot
         "name": snap.get("name", ""),
         "dosage": snap.get("dosage", ""),
         "pills_per_dose": snap.get("pills_per_dose", 1),
@@ -77,7 +83,7 @@ def upsert_dose_log(
     snapshot: dict,
 ) -> dict:
     """
-    Insert a dose log if it doesn't exist yet (lazy upsert).
+    Insert a dose log if it doesn't exist yet (lazy upsert via $setOnInsert).
     Returns the existing or newly created document.
     """
     col = get_dose_logs_collection()
@@ -99,6 +105,8 @@ def upsert_dose_log(
             "taken_at": None,
             "was_late": False,
             "stock_decremented": False,
+            "missed_at": None,
+            "escalation_status": "none",
             "medicine_snapshot": snapshot,
             "created_at": now,
             "updated_at": now,
@@ -108,10 +116,9 @@ def upsert_dose_log(
         filter_q,
         update_q,
         upsert=True,
-        return_document=True,  # returns the doc after the operation
+        return_document=True,
     )
     if result is None:
-        # find_one_and_update with upsert may return None in some edge cases; re-fetch
         result = col.find_one(filter_q)
     return result
 
@@ -128,24 +135,48 @@ def find_dose_by_id(dose_id: str, user_id: str):
 def mark_dose_taken(dose_id: str, user_id: str, now_utc: datetime, was_late: bool):
     """
     Atomically mark a pending/missed dose as taken.
-    Uses a conditional filter so a race doesn't double-mark.
+    If the dose was missed and had escalation_status="pending", cancel the escalation
+    so Step 7 never alerts family about a dose that was just taken late.
     Returns the updated doc or None if already taken / not found.
     """
     col = get_dose_logs_collection()
+    # Build the $set, then conditionally cancel escalation
+    set_fields = {
+        "status": "taken",
+        "taken_at": now_utc,
+        "was_late": was_late,
+        "updated_at": now_utc,
+    }
+    # We need to also cancel escalation atomically for missed doses.
+    # We can't use a conditional $set in a single update easily without aggregation pipeline update,
+    # so we include escalation_status in the filter to handle both cases:
+    # Case A: dose was pending (escalation_status is "none") — keep it "none"
+    # Case B: dose was missed with escalation_status "pending" — set it "cancelled"
+    # We do two atomic find_one_and_update calls: first try with missed+pending escalation,
+    # if that returns None try with pending/missed status (covers pending doses & stale missed).
+
+    # Try missed with pending escalation first
+    updated = col.find_one_and_update(
+        {
+            "_id": ObjectId(dose_id),
+            "user_id": user_id,
+            "status": "missed",
+            "escalation_status": "pending",
+        },
+        {"$set": {**set_fields, "escalation_status": "cancelled"}},
+        return_document=True,
+    )
+    if updated is not None:
+        return updated
+
+    # Try any pending/missed dose (covers pending doses, stale missed, etc.)
     return col.find_one_and_update(
         {
             "_id": ObjectId(dose_id),
             "user_id": user_id,
             "status": {"$in": ["pending", "missed"]},
         },
-        {
-            "$set": {
-                "status": "taken",
-                "taken_at": now_utc,
-                "was_late": was_late,
-                "updated_at": now_utc,
-            }
-        },
+        {"$set": set_fields},
         return_document=True,
     )
 
@@ -153,6 +184,7 @@ def mark_dose_taken(dose_id: str, user_id: str, now_utc: datetime, was_late: boo
 def undo_dose_taken(dose_id: str, user_id: str):
     """
     Atomically revert a taken dose back to pending.
+    Resets escalation_status to "none" and missed_at to null.
     Returns the updated doc or None if not taken / not found.
     """
     col = get_dose_logs_collection()
@@ -165,6 +197,8 @@ def undo_dose_taken(dose_id: str, user_id: str):
                 "taken_at": None,
                 "was_late": False,
                 "stock_decremented": False,
+                "missed_at": None,
+                "escalation_status": "none",
                 "updated_at": now,
             }
         },

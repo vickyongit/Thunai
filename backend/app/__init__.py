@@ -54,6 +54,10 @@ def create_app(config=None):
     app.register_blueprint(medicines_bp)
     app.register_blueprint(doses_bp)
 
+    # ---------- Scheduler ----------
+    from .schedulers.reminder_scheduler import start_scheduler
+    start_scheduler(app)
+
     # ---------- DB indexes (non-fatal if Mongo is down at startup) ----------
     with app.app_context():
         try:

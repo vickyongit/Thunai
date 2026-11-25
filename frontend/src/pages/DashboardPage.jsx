@@ -136,7 +136,11 @@ function DoseCard({ dose, serverTimeOffset, onTake, onUndo, loadingIds }) {
             disabled={isBusy}
             className="min-h-[48px] elder-mode:min-h-[56px] px-5 rounded-xl font-semibold text-sm bg-green-500 hover:bg-green-600 active:scale-95 text-white transition-all disabled:opacity-60 disabled:cursor-not-allowed shadow-sm"
           >
-            {isBusy ? <LoadingSpinner size="sm" /> : '✓ Mark as Taken'}
+            {isBusy
+              ? <LoadingSpinner size="sm" />
+              : dose.status === 'missed'
+                ? '✓ I took it late'
+                : '✓ Mark as Taken'}
           </button>
         )}
         {dose.status === 'taken' && (
